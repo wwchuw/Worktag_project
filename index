@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<base target="_top">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#14453A;         /* เขียวเข้ม ตัวอักษรหลัก */
+    --paper:#F6F3ED;       /* พื้นกระดาษ */
+    --sand:#E4DCCC;        /* เส้นคั่น */
+    --sage:#6E8578;        /* ตัวอักษรรอง */
+    --alert:#D8394F;       /* ค้าง เลยกำหนด */
+    --work:#B8862B;        /* กำลังทำ */
+    --ok:#3E7D5A;          /* เสร็จแล้ว */
+  }
+
+  *{ box-sizing:border-box; }
+
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'IBM Plex Sans Thai', system-ui, sans-serif;
+    font-size:15px;
+    line-height:1.55;
+  }
+
+  .wrap{ max-width:940px; margin:0 auto; padding:28px 20px 64px; }
+
+  /* ---------- หัวเรื่อง ---------- */
+  .top{
+    display:flex; align-items:baseline; justify-content:space-between;
+    gap:16px; flex-wrap:wrap;
+    border-bottom:2px solid var(--ink); padding-bottom:10px;
+  }
+  .top h1{ margin:0; font-size:21px; font-weight:600; letter-spacing:-.01em; }
+  .top .when{ color:var(--sage); font-size:13px; }
+
+  /* ---------- แถบสิ่งที่ค้าง ---------- */
+  .overdue{ margin:22px 0 34px; }
+  .overdue h2{
+    margin:0 0 10px; font-size:15px; font-weight:600;
+    display:flex; align-items:center; gap:8px;
+  }
+  .count{
+    background:var(--alert); color:#fff; font-size:13px; font-weight:500;
+    border-radius:11px; padding:1px 9px; line-height:1.6;
+  }
+  .count.clear{ background:var(--ok); }
+
+  .late-row{
+    display:flex; gap:14px; padding:9px 0;
+    border-top:1px solid var(--sand); font-size:14px;
+  }
+  .late-row:last-child{ border-bottom:1px solid var(--sand); }
+  .late-row .days{ color:var(--alert); font-weight:600; white-space:nowrap; min-width:86px; }
+  .late-row .who{ color:var(--sage); }
+
+  .allclear{
+    border-top:1px solid var(--sand); border-bottom:1px solid var(--sand);
+    padding:12px 0; color:var(--sage); font-size:14px;
+  }
+
+  /* ---------- รายการสัญญา ---------- */
+  .tools{
+    display:flex; gap:8px; align-items:center; flex-wrap:wrap;
+    margin:0 0 12px; font-size:14px;
+  }
+  .tools label{ display:flex; align-items:center; gap:6px; color:var(--sage); cursor:pointer; }
+  .tools input[type=search]{
+    flex:1; min-width:180px; font:inherit; font-size:14px;
+    padding:7px 10px; border:1px solid var(--sand); border-radius:6px;
+    background:#fff; color:var(--ink);
+  }
+  .tools input[type=search]:focus{ outline:2px solid var(--ink); outline-offset:1px; }
+
+  .group{
+    margin:26px 0 4px; font-size:13px; font-weight:600; color:var(--sage);
+    display:flex; align-items:center; gap:7px;
+  }
+  .group .n{ font-weight:400; }
+
+  .item{ border-top:1px solid var(--sand); }
+  .item:last-of-type{ border-bottom:1px solid var(--sand); }
+
+  .head{
+    width:100%; text-align:left; background:none; border:0; font:inherit; color:inherit;
+    display:grid; grid-template-columns:4px 1fr auto; gap:0 14px;
+    padding:14px 4px; cursor:pointer;
+  }
+  .head:focus-visible{ outline:2px solid var(--ink); outline-offset:-2px; }
+  .bar{ background:var(--sage); border-radius:2px; }
+  .bar.late{ background:var(--alert); }
+  .bar.closed{ background:var(--sand); }
+  .bar.pre{ background:var(--work); }
+
+  .name{ font-weight:600; }
+  .job{ color:var(--sage); font-size:13.5px; }
+  .meta{ text-align:right; font-size:13px; color:var(--sage); white-space:nowrap; }
+  .meta b{ color:var(--alert); font-weight:600; }
+  .meta .closed{ color:var(--sage); }
+  .meta .phase{ color:var(--work); font-weight:500; }
+
+  /* ---------- รายละเอียด ---------- */
+  .detail{ padding:2px 4px 22px 22px; display:none; }
+  .item.open .detail{ display:block; }
+
+  .facts{ margin:0 0 18px; font-size:14px; }
+  .facts div{ display:flex; gap:10px; padding:3px 0; }
+  .facts dt{ color:var(--sage); width:82px; flex:none; }
+  .facts dd{ margin:0; }
+
+  .sub{ font-size:13px; font-weight:600; margin:0 0 8px; }
+
+  /* ไทม์ไลน์ — เนื้อหาเป็นลำดับจริง จึงใช้เส้นและจุด */
+  .line{ list-style:none; margin:0 0 20px; padding:0 0 0 18px; border-left:1px solid var(--sand); }
+  .line li{ position:relative; padding:0 0 14px 14px; }
+  .line li::before{
+    content:''; position:absolute; left:-23px; top:6px;
+    width:9px; height:9px; border-radius:50%;
+    background:var(--paper); border:2px solid var(--sage);
+  }
+  .line li.done::before{ background:var(--ok); border-color:var(--ok); }
+  .line li.doing::before{ background:var(--work); border-color:var(--work); }
+  .line li.late::before{ background:var(--alert); border-color:var(--alert); }
+
+  .line .step{ font-weight:500; }
+  .line li.done .step{ color:var(--sage); font-weight:400; }
+  .line .when2{ font-size:13px; color:var(--sage); }
+  .line .flag{ font-size:13px; color:var(--alert); font-weight:500; }
+  .line .memo{ font-size:13px; color:var(--sage); font-style:italic; }
+
+  .log{ list-style:none; margin:0; padding:0; font-size:13.5px; }
+  .log li{ display:flex; gap:10px; padding:4px 0; color:var(--sage); }
+  .log .d{ color:var(--ink); white-space:nowrap; }
+  .log a{ color:var(--ink); }
+  .facts a{ color:var(--ink); }
+
+  .muted{ color:var(--sage); font-size:13.5px; }
+
+  .state{ padding:40px 0; color:var(--sage); }
+
+  /* ---------- สลับมุมมอง ---------- */
+  .views{ display:flex; gap:2px; }
+  .views button{
+    font:inherit; font-size:13px; padding:6px 12px; cursor:pointer;
+    border:1px solid var(--sand); background:#fff; color:var(--sage);
+  }
+  .views button:first-child{ border-radius:6px 0 0 6px; }
+  .views button:last-child{ border-radius:0 6px 6px 0; border-left:0; }
+  .views button[aria-pressed=true]{ background:var(--ink); border-color:var(--ink); color:#fff; }
+  .views button:focus-visible{ outline:2px solid var(--ink); outline-offset:1px; }
+
+  /* ---------- แกนต์ ---------- */
+  .gantt{ overflow-x:auto; padding-bottom:8px; }
+  .gantt-inner{ min-width:100%; }
+
+  .months{ display:flex; border-bottom:1px solid var(--sand); margin-left:var(--lab); }
+  .months span{
+    flex:none; font-size:12px; color:var(--sage); padding:0 0 5px 6px;
+    border-left:1px solid var(--sand);
+  }
+
+  .grow{ margin:16px 0 4px; font-size:13.5px; font-weight:600; }
+  .grow .gsub{ color:var(--sage); font-weight:400; }
+
+  .track{ display:flex; align-items:center; gap:0; padding:3px 0; }
+  .track .lab{
+    width:var(--lab); flex:none; font-size:13px; padding-right:10px;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .track.late .lab{ color:var(--alert); }
+  .track .rail{ position:relative; flex:1; height:22px; }
+  .track .rail::before{
+    content:''; position:absolute; inset:9px 0 auto 0; height:1px; background:var(--sand);
+  }
+  .bar2{
+    position:absolute; top:4px; height:12px; border-radius:3px;
+    background:var(--sage); min-width:3px;
+  }
+  .bar2 .tag{
+    position:absolute; left:100%; top:-3px; margin-left:7px;
+    font-size:11.5px; color:var(--sage); white-space:nowrap;
+  }
+  .bar2.late .tag{ color:var(--alert); }
+  .bar2.tagleft .tag{ left:auto; right:100%; margin:0 7px 0 0; }
+
+  /* เส้นแบ่งเดือนจาง ๆ ในพื้นที่ราง */
+  .grid{ position:absolute; inset:0; pointer-events:none; }
+  .grid span{ position:absolute; top:0; bottom:0; width:1px; background:var(--sand); opacity:.7; }
+  .bar2.done{ background:var(--ok); }
+  .bar2.doing{ background:var(--work); }
+  .bar2.late{ background:var(--alert); }
+  .bar2.milestone{ border-radius:50%; width:12px; }
+
+  .today{
+    position:absolute; top:0; bottom:0; width:1px; background:var(--alert); opacity:.55;
+  }
+  .todaywrap{ position:relative; margin-left:var(--lab); }
+
+  .jump{ margin:10px 0 0; }
+  .jump button{
+    font:inherit; font-size:13px; color:var(--ink); background:none;
+    border:0; border-bottom:1px solid var(--sage); padding:0 0 1px; cursor:pointer;
+  }
+  .jump button:hover{ border-bottom-color:var(--ink); }
+  .jump button:focus-visible{ outline:2px solid var(--ink); outline-offset:2px; }
+
+  .legend{ display:flex; gap:14px; flex-wrap:wrap; font-size:12.5px; color:var(--sage); margin-top:14px; }
+  .legend i{ display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:5px; }
+
+  @media (max-width:560px){
+    .gantt-inner{ --lab:110px; }
+  }
+
+  @media (max-width:560px){
+    .wrap{ padding:20px 14px 48px; }
+    .head{ grid-template-columns:4px 1fr; }
+    .meta{ grid-column:2; text-align:left; padding-top:2px; }
+    .detail{ padding-left:14px; }
+    .late-row{ flex-direction:column; gap:2px; }
+  }
+</style>
+</head>
+
+<body>
+<div class="wrap">
+
+  <div class="top">
+    <h1>ติดตามงานสัญญา</h1>
+    <span class="when" id="when"></span>
+  </div>
+
+  <section class="overdue" id="overdue" hidden>
+    <h2>เลยกำหนดแล้ว <span class="count" id="lateCount">0</span></h2>
+    <div id="lateList"></div>
+  </section>
+
+  <div class="tools">
+    <input type="search" id="q" placeholder="ค้นเลขที่สัญญา ชื่องาน หรือผู้รับจ้าง">
+    <label><input type="checkbox" id="showClosed"> รวมสัญญาที่ปิดแล้ว</label>
+    <span class="views">
+      <button id="vList" aria-pressed="true">รายการ</button>
+      <button id="vGantt" aria-pressed="false">ไทม์ไลน์</button>
+    </span>
+  </div>
+
+  <div id="list"><p class="state">กำลังโหลดข้อมูล…</p></div>
+  <div id="gantt" hidden></div>
+</div>
+
+<script>
+var DATA = null;
+
+google.script.run
+  .withSuccessHandler(start)
+  .withFailureHandler(function(err){
+    document.getElementById('list').innerHTML =
+      '<p class="state">เปิดข้อมูลไม่ได้ ตรวจสิทธิ์เข้าถึงชีตแล้วลองโหลดหน้าใหม่<br>' +
+      esc(err && err.message ? err.message : err) + '</p>';
+  })
+  .wtdData();
+
+function start(d){
+  DATA = d;
+  document.getElementById('when').textContent = 'ข้อมูล ณ ' + thai(d.today);
+  drawOverdue();
+  draw();
+  document.getElementById('q').addEventListener('input', draw);
+  document.getElementById('showClosed').addEventListener('change', draw);
+  document.getElementById('vList').addEventListener('click', function(){ setView('list'); });
+  document.getElementById('vGantt').addEventListener('click', function(){ setView('gantt'); });
+}
+
+var VIEW = 'list';
+
+function setView(v){
+  VIEW = v;
+  document.getElementById('vList').setAttribute('aria-pressed', v === 'list' ? 'true' : 'false');
+  document.getElementById('vGantt').setAttribute('aria-pressed', v === 'gantt' ? 'true' : 'false');
+  draw();
+}
+
+/** สัญญาที่ผ่านตัวกรองค้นหาและสถานะ */
+function visible(){
+  var q = document.getElementById('q').value.trim().toLowerCase();
+  var withClosed = document.getElementById('showClosed').checked;
+
+  return DATA.contracts.filter(function(c){
+    if (!withClosed && c.closed) return false;
+    if (!q) return true;
+    return (c.contract + ' ' + c.job + ' ' + c.vendor).toLowerCase().indexOf(q) >= 0;
+  });
+}
+
+/* ---------- แถบสิ่งที่ค้าง ---------- */
+function drawOverdue(){
+  var rows = [];
+  DATA.contracts.forEach(function(c){
+    if (c.closed) return;
+    c.steps.forEach(function(s){
+      if (s.state !== 'late') return;
+      rows.push({ c:c, s:s, over: -(s.days === null ? 0 : s.days) });
+    });
+  });
+  rows.sort(function(a, b){ return b.over - a.over; });
+
+  var box = document.getElementById('overdue');
+  var list = document.getElementById('lateList');
+  var cnt = document.getElementById('lateCount');
+  box.hidden = false;
+
+  if (!rows.length){
+    cnt.textContent = 'ไม่มี';
+    cnt.className = 'count clear';
+    list.innerHTML = '<p class="allclear">ทุกขั้นตอนยังอยู่ในกำหนด</p>';
+    return;
+  }
+
+  cnt.textContent = rows.length + ' ขั้นตอน';
+  cnt.className = 'count';
+  list.innerHTML = rows.slice(0, 8).map(function(r){
+    return '<div class="late-row">' +
+             '<span class="days">เลย ' + r.over + ' วัน</span>' +
+             '<span>' + esc(r.s.step) + '</span>' +
+             '<span class="who">' + esc(r.c.contract) + '</span>' +
+           '</div>';
+  }).join('');
+}
+
+/* ---------- รายการสัญญา ---------- */
+function draw(){
+  var listEl  = document.getElementById('list');
+  var ganttEl = document.getElementById('gantt');
+  listEl.hidden  = (VIEW !== 'list');
+  ganttEl.hidden = (VIEW !== 'gantt');
+
+  if (VIEW === 'gantt') return drawGantt(visible());
+
+  var q = document.getElementById('q').value.trim().toLowerCase();
+  var rows = visible();
+
+  rows.sort(function(a, b){
+    if (a.lateN !== b.lateN) return b.lateN - a.lateN;
+    var ka = a.due || '9999', kb = b.due || '9999';
+    return (ka < kb) ? -1 : (ka > kb ? 1 : 0);
+  });
+
+  var el = document.getElementById('list');
+
+  if (!rows.length){
+    el.innerHTML = '<p class="state">' +
+      (q ? 'ไม่พบสัญญาที่ตรงกับคำค้น' : 'ยังไม่มีสัญญาในทะเบียน เพิ่มได้ที่แท็บ contract') +
+      '</p>';
+    return;
+  }
+
+  var pre  = rows.filter(function(c){ return !c.signed; });
+  var sign = rows.filter(function(c){ return c.signed; });
+
+  var html = '';
+  if (pre.length){
+    html += '<p class="group">ยังไม่ลงนาม <span class="n">' + pre.length + '</span></p>' +
+            pre.map(item).join('');
+  }
+  if (sign.length){
+    html += '<p class="group">มีคู่สัญญาแล้ว <span class="n">' + sign.length + '</span></p>' +
+            sign.map(item).join('');
+  }
+  el.innerHTML = html;
+
+  Array.prototype.forEach.call(el.querySelectorAll('.head'), function(btn){
+    btn.addEventListener('click', function(){
+      var box = btn.parentNode;
+      var open = box.classList.toggle('open');
+      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    });
+  });
+
+  Array.prototype.forEach.call(el.querySelectorAll('.tojump'), function(btn){
+    btn.addEventListener('click', function(){
+      document.getElementById('q').value = btn.getAttribute('data-c');
+      setView('gantt');
+      document.getElementById('gantt').scrollIntoView({ block:'start' });
+    });
+  });
+}
+
+function item(c){
+  var barClass = !c.signed ? 'pre' : (c.closed ? 'closed' : (c.lateN ? 'late' : ''));
+
+  var meta;
+  if (!c.signed){
+    meta = '<span class="phase">' + esc(c.phase) + '</span>';
+  } else if (c.closed){
+    meta = '<span class="closed">ปิดแล้ว</span>';
+  } else if (c.lateN){
+    meta = '<b>ค้าง ' + c.lateN + ' ขั้น</b>';
+  } else if (c.dueDays !== null){
+    meta = (c.dueDays < 0) ? '<b>เลยกำหนด ' + (-c.dueDays) + ' วัน</b>'
+         : (c.dueDays === 0) ? 'ครบกำหนดวันนี้'
+         : 'เหลือ ' + c.dueDays + ' วัน';
+  } else {
+    meta = 'ไม่ได้ระบุกำหนด';
+  }
+
+  var prog = c.steps.length ? (c.doneN + '/' + c.steps.length + ' ขั้น') : 'ยังไม่มีแผนงาน';
+
+  return '<div class="item">' +
+    '<button class="head" aria-expanded="false">' +
+      '<span class="bar ' + barClass + '"></span>' +
+      '<span><span class="name">' + esc(c.contract) + '</span>' +
+        (c.job ? '<br><span class="job">' + esc(c.job) + '</span>' : '') + '</span>' +
+      '<span class="meta">' + meta + '<br>' + prog + '</span>' +
+    '</button>' +
+    '<div class="detail">' + detail(c) + '</div>' +
+  '</div>';
+}
+
+function detail(c){
+  var h = '<dl class="facts">';
+  if (c.phase)  h += row('ขั้นตอน', esc(c.phase));
+  if (c.tor)    h += row('เอกสาร', '<a href="' + esc(c.tor) +
+                         '" target="_blank" rel="noopener">เปิดโฟลเดอร์ TOR</a>');
+  if (c.vendor) h += row(c.signed ? 'ผู้รับจ้าง' : 'ผู้เสนอราคา', esc(c.vendor));
+  h += row('ระยะสัญญา', (c.start ? thai(c.start) : '—') + ' ถึง ' + (c.due ? thai(c.due) : '—'));
+  if (c.status) h += row('สถานะ', esc(c.status));
+  if (c.note)   h += row('หมายเหตุ', esc(c.note));
+  h += '</dl>';
+
+  h += '<p class="sub">แผนงาน</p>';
+  if (!c.steps.length){
+    h += '<p class="muted">ยังไม่ได้วางแผนงาน เพิ่มขั้นตอนได้ที่แท็บ contract_step</p>';
+  } else {
+    h += '<ul class="line">' + c.steps.map(stepLi).join('') + '</ul>';
+    h += '<p class="jump"><button type="button" class="tojump" data-c="' +
+         esc(c.contract) + '">ดูแผนนี้ในไทม์ไลน์</button></p>';
+  }
+
+  h += '<p class="sub">บันทึกจากหน้างาน</p>';
+  if (!c.logs.length){
+    h += '<p class="muted">ยังไม่มีใครติดแท็กในกลุ่มของสัญญานี้</p>';
+  } else {
+    h += '<ul class="log">' + c.logs.slice(0, 6).map(function(x){
+      var tail = [];
+      if (x.where) tail.push(esc(x.where));
+      if (x.note)  tail.push(esc(x.note));
+      if (x.files) tail.push(x.folder
+        ? '<a href="' + esc(x.folder) + '" target="_blank" rel="noopener">ไฟล์ ' + x.files + '</a>'
+        : 'ไฟล์ ' + x.files);
+      return '<li><span class="d">' + (x.date ? thai(x.date) : '—') + '</span>' +
+             '<span>' + esc(x.type) + (tail.length ? ' — ' + tail.join(' ') : '') + '</span></li>';
+    }).join('') + '</ul>';
+    if (c.logs.length > 6){
+      h += '<p class="muted">อีก ' + (c.logs.length - 6) + ' รายการ ดูได้ในชีต</p>';
+    }
+  }
+  return h;
+}
+
+function stepLi(s){
+  var when;
+  if (s.planStart && s.planEnd && s.planStart !== s.planEnd){
+    when = 'แผน ' + thai(s.planStart) + ' ถึง ' + thai(s.planEnd);
+  } else if (s.planEnd || s.planStart){
+    when = 'แผน ' + thai(s.planEnd || s.planStart);
+  } else {
+    when = 'ยังไม่ได้กำหนดวัน';
+  }
+
+  var flag = '';
+  if (s.state === 'done'){
+    when += ' — เสร็จ ' + thai(s.done);
+  } else if (s.state === 'doing'){
+    when += ' — เริ่มแล้ว ' + thai(s.began);
+    if (s.days !== null && s.days < 0) flag = 'เลยกำหนดจบ ' + (-s.days) + ' วัน';
+  } else if (s.state === 'late'){
+    flag = (s.days !== null && s.days < 0) ? 'เลยมาแล้ว ' + (-s.days) + ' วัน' : 'ถึงกำหนดเริ่มแล้ว';
+  } else if (s.days !== null){
+    when += (s.days === 0) ? ' — วันนี้' : ' — อีก ' + s.days + ' วัน';
+  }
+
+  return '<li class="' + s.state + '">' +
+    '<div class="step">' + esc(s.step) + '</div>' +
+    '<div class="when2">' + when + '</div>' +
+    (flag ? '<div class="flag">' + flag + '</div>' : '') +
+    (s.note ? '<div class="memo">' + esc(s.note) + '</div>' : '') +
+  '</li>';
+}
+
+function row(k, v){ return '<div><dt>' + k + '</dt><dd>' + v + '</dd></div>'; }
+
+/* ---------- ไทม์ไลน์ ---------- */
+var PX_MONTH = 104;          // ความกว้างต่อเดือน
+var LABEL_W  = 170;          // ความกว้างคอลัมน์ชื่อขั้นตอน
+
+function drawGantt(rows){
+  var el = document.getElementById('gantt');
+
+  var withSteps = rows.filter(function(c){ return c.steps.length; });
+  if (!withSteps.length){
+    el.innerHTML = '<p class="state">ยังไม่มีแผนงานให้แสดง เพิ่มขั้นตอนได้ที่แท็บ contract_step</p>';
+    return;
+  }
+
+  /* --- หาช่วงเวลาที่ต้องแสดง --- */
+  var lo = null, hi = null;
+  withSteps.forEach(function(c){
+    c.steps.forEach(function(s){
+      [s.planStart, s.planEnd, s.began, s.done].forEach(function(d){
+        if (!d) return;
+        if (lo === null || d < lo) lo = d;
+        if (hi === null || d > hi) hi = d;
+      });
+    });
+  });
+  if (lo === null){
+    el.innerHTML = '<p class="state">แผนงานยังไม่ได้ระบุวันที่</p>';
+    return;
+  }
+  if (DATA.today < lo) lo = DATA.today;
+  if (DATA.today > hi) hi = DATA.today;
+
+  var first = monthStart(lo);
+  var last  = monthStart(hi);
+  var months = [];
+  var cur = first;
+  while (cur <= last && months.length < 60){
+    months.push(cur);
+    cur = addMonth(cur, 1);
+  }
+  var endEx = addMonth(last, 1);                 // วันแรกของเดือนถัดจากเดือนสุดท้าย
+  var span  = days(first, endEx);
+  var width = months.length * PX_MONTH;
+
+  /* --- หัวเดือน --- */
+  var head = '<div class="months">' + months.map(function(m){
+    var p = m.split('-');
+    return '<span style="width:' + PX_MONTH + 'px">' + TH[Number(p[1]) - 1] +
+           (Number(p[1]) === 1 || m === first ? ' ' + String(Number(p[0]) + 543).slice(-2) : '') +
+           '</span>';
+  }).join('') + '</div>';
+
+  /* --- เส้นวันนี้ --- */
+  var tPct = pct(first, DATA.today, span);
+  var todayLine = '<div class="todaywrap" style="height:0">' +
+      '<div class="today" style="left:' + tPct + '%; height:' + rowsHeight(withSteps) + 'px"></div>' +
+    '</div>';
+
+  /* --- เส้นแบ่งเดือน ใช้ซ้ำทุกราง --- */
+  var grid = '<span class="grid">' + months.map(function(m, i){
+    if (!i) return '';
+    return '<span style="left:' + pct(first, m, span) + '%"></span>';
+  }).join('') + '</span>';
+
+  /* --- แต่ละสัญญา --- */
+  var body = withSteps.map(function(c){
+    var h = '<p class="grow" title="' + esc(c.job || '') + '">' + esc(c.contract) + '</p>';
+
+    h += c.steps.map(function(s){
+      var a = s.began || s.planStart || s.planEnd || s.done;
+      var b = s.done || s.planEnd || s.planStart || s.began;
+      if (!a) return '';
+      if (b < a){ var t = a; a = b; b = t; }
+
+      var left  = pct(first, a, span);
+      var right = pct(first, addDay(b, 1), span);
+      var wPct  = Math.max(right - left, 0.4);
+      var point = (a === b);
+
+      /* ป้ายวันที่ ถ้าแท่งอยู่ค่อนไปทางขวามาก ให้ย้ายไปไว้ซ้ายกันตกขอบ */
+      var tag  = point ? dayLabel(a)
+               : (a.slice(0, 7) === b.slice(0, 7))
+                 ? (Number(a.slice(8)) + ' – ' + dayLabel(b))     // เดือนเดียวกัน ไม่ต้องซ้ำ
+                 : (dayLabel(a) + ' – ' + dayLabel(b));
+      var side = (right > 82) ? ' tagleft' : '';
+
+      return '<div class="track ' + (s.state === 'late' ? 'late' : '') + '">' +
+          '<span class="lab" title="' + esc(s.step) + '">' + esc(s.step) + '</span>' +
+          '<span class="rail">' + grid +
+            '<span class="bar2 ' + s.state + (point ? ' milestone' : '') + side + '" ' +
+                  'style="left:' + left + '%;' +
+                  (point ? '' : 'width:' + wPct + '%;') + '" ' +
+                  'title="' + esc(barTitle(s)) + '">' +
+              '<span class="tag">' + tag + '</span>' +
+            '</span>' +
+          '</span>' +
+        '</div>';
+    }).join('');
+
+    return h;
+  }).join('');
+
+  el.innerHTML =
+    '<div class="gantt"><div class="gantt-inner" style="--lab:' + LABEL_W + 'px; width:' +
+      (LABEL_W + width) + 'px">' +
+      head + todayLine + body +
+    '</div></div>' +
+    '<div class="legend">' +
+      '<span><i style="background:var(--ok)"></i>เสร็จแล้ว</span>' +
+      '<span><i style="background:var(--work)"></i>กำลังทำ</span>' +
+      '<span><i style="background:var(--alert)"></i>เลยกำหนด</span>' +
+      '<span><i style="background:var(--sage)"></i>ยังไม่ถึงกำหนด</span>' +
+      '<span>เส้นแดงตั้ง คือวันนี้</span>' +
+    '</div>' +
+    (document.getElementById('q').value.trim()
+      ? '<p class="jump"><button type="button" id="clearFilter">ล้างตัวกรอง ดูทุกสัญญา</button></p>'
+      : '');
+
+  var cf = document.getElementById('clearFilter');
+  if (cf) cf.addEventListener('click', function(){
+    document.getElementById('q').value = '';
+    draw();
+  });
+  return;
+}
+
+function barTitle(s){
+  var t = s.step;
+  if (s.planStart || s.planEnd){
+    t += ' — แผน ' + thai(s.planStart || s.planEnd);
+    if (s.planEnd && s.planStart && s.planEnd !== s.planStart) t += ' ถึง ' + thai(s.planEnd);
+  }
+  if (s.began) t += ' · เริ่ม ' + thai(s.began);
+  if (s.done)  t += ' · เสร็จ ' + thai(s.done);
+  if (s.note)  t += ' · ' + s.note;
+  return t;
+}
+
+function rowsHeight(list){
+  var n = 0;
+  list.forEach(function(c){ n += c.steps.length; });
+  return n * 26 + list.length * 40;
+}
+
+function short(t, n){ return t.length > n ? t.slice(0, n - 1) + '…' : t; }
+
+/** 18/09/2026 → 18 ก.ย. */
+function dayLabel(iso){
+  var p = String(iso).split('-');
+  if (p.length < 3) return iso;
+  return Number(p[2]) + ' ' + TH[Number(p[1]) - 1];
+}
+
+/* ---------- วันที่ ---------- */
+function monthStart(iso){ return iso.slice(0, 7) + '-01'; }
+
+function addMonth(iso, k){
+  var p = iso.split('-');
+  var y = Number(p[0]), m = Number(p[1]) - 1 + k;
+  y += Math.floor(m / 12); m = ((m % 12) + 12) % 12;
+  return y + '-' + ('0' + (m + 1)).slice(-2) + '-01';
+}
+
+function addDay(iso, k){
+  var d = new Date(Date.parse(iso) + k * 86400000);
+  return d.toISOString().slice(0, 10);
+}
+
+function days(a, b){ return Math.round((Date.parse(b) - Date.parse(a)) / 86400000); }
+
+function pct(first, iso, span){
+  var v = days(first, iso) / span * 100;
+  return Math.max(0, Math.min(100, Math.round(v * 100) / 100));
+}
+
+/* ---------- utils ---------- */
+var TH = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+
+function thai(iso){
+  if (!iso) return '—';
+  var p = String(iso).split('-');
+  if (p.length < 3) return iso;
+  var yy = String(Number(p[0]) + 543).slice(-2);     // 2026 → 69
+  return Number(p[2]) + ' ' + TH[Number(p[1]) - 1] + ' ' + yy;
+}
+
+function esc(s){
+  return String(s === null || s === undefined ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+</script>
+</body>
+</html>

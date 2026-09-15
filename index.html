@@ -112,7 +112,7 @@
   .facts{ margin:0 0 18px; font-size:14px; }
   .facts div{ display:flex; gap:10px; padding:3px 0; }
   .facts dt{ color:var(--sage); width:82px; flex:none; }
-  .facts dd{ margin:0; }
+  .facts dd{ margin:0; white-space:pre-line; }
 
   .sub{ font-size:13px; font-weight:600; margin:0 0 8px; }
 
@@ -260,7 +260,7 @@ var DATA = null;
  * GitHub Pages → Apps Script API (JSONP)
  * ถ้า Deploy ใหม่แล้วได้ URL ใหม่ ให้แก้บรรทัดนี้บรรทัดเดียว
  * ------------------------------------------------------------------------ */
-var API_URL = 'https://script.google.com/macros/s/AKfycbzjElWDbRkl3n7eO50sZmiguECtbmxpAqfeVSdtTUv5lGEWnZPSnVYbmNFJJH4xAJO83w/exec';
+var API_URL = 'https://script.google.com/macros/s/AKfycbwJToAlpc-QSDFZAWQpSQL4k9ldqttx3ctJ23HCwxB7CRq3YaOhkhtSe3bZwJqMeancAg/exec';
 
 function loadData(){
   var cb = 'wtdCallback_' + Date.now();

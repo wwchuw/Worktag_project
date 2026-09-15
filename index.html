@@ -77,6 +77,15 @@
     background:#fff; color:var(--ink);
   }
   .tools input[type=search]:focus{ outline:2px solid var(--ink); outline-offset:1px; }
+  .tools select{
+    font:inherit; font-size:14px; padding:6px 8px; border:1px solid var(--sand);
+    border-radius:6px; background:#fff; color:var(--ink); cursor:pointer;
+  }
+  .tools select:focus{ outline:2px solid var(--ink); outline-offset:1px; }
+  .owner{
+    display:inline-block; font-size:12px; color:var(--ink); background:var(--sand);
+    border-radius:4px; padding:0 6px; margin-left:6px; font-weight:500; vertical-align:1px;
+  }
 
   .group{
     margin:26px 0 4px; font-size:13px; font-weight:600; color:var(--sage);
@@ -242,6 +251,19 @@
 
   <div class="tools">
     <input type="search" id="q" placeholder="ค้นเลขที่สัญญา ชื่องาน หรือผู้รับจ้าง">
+    <select id="kind" aria-label="ประเภท">
+      <option value="">ซื้อ/จ้าง: ทั้งหมด</option>
+      <option value="ซื้อ">ซื้อ</option>
+      <option value="จ้าง">จ้าง</option>
+    </select>
+    <select id="fund" aria-label="ประเภทงบ">
+      <option value="">งบ: ทั้งหมด</option>
+      <option value="ลงทุน">งบลงทุน</option>
+      <option value="ทำการ">งบทำการ</option>
+    </select>
+    <select id="owner" aria-label="เจ้าของงบ">
+      <option value="">เจ้าของงบ: ทั้งหมด</option>
+    </select>
     <label><input type="checkbox" id="showClosed"> รวมสัญญาที่ปิดแล้ว</label>
     <span class="views">
       <button id="vList" aria-pressed="true">รายการ</button>
@@ -299,9 +321,14 @@ function loadData(){
 function start(d){
   DATA = d;
   document.getElementById('when').textContent = 'ข้อมูล ณ ' + thai(d.today);
-  drawOverdue();
+  DATA.contracts.forEach(function(c){ c.kind = kindOf(c.contract); });
+  fillOwners();
+  readUrl();
   draw();
   document.getElementById('q').addEventListener('input', draw);
+  FILTERS.forEach(function(id){
+    document.getElementById(id).addEventListener('change', function(){ saveUrl(); draw(); });
+  });
   document.getElementById('showClosed').addEventListener('change', draw);
   document.getElementById('vList').addEventListener('click', function(){ setView('list'); });
   document.getElementById('vGantt').addEventListener('click', function(){ setView('gantt'); });
@@ -316,15 +343,93 @@ function setView(v){
   draw();
 }
 
-/** สัญญาที่ผ่านตัวกรองค้นหาและสถานะ */
+var NO_OWNER = '__none__';
+
+/** เติมตัวเลือกเจ้าของงบจากข้อมูลจริง */
+function fillOwners(){
+  var seen = {}, list = [], blank = false;
+  DATA.contracts.forEach(function(c){
+    if (!c.owner){ blank = true; return; }
+    if (!seen[c.owner]){ seen[c.owner] = 1; list.push(c.owner); }
+  });
+  list.sort(function(a, b){ return a.localeCompare(b, 'th'); });
+
+  var sel = document.getElementById('owner');
+  sel.innerHTML = '<option value="">เจ้าของงบ: ทั้งหมด</option>' +
+    list.map(function(o){
+      return '<option value="' + esc(o) + '">' + esc(o) + '</option>';
+    }).join('') +
+    (blank ? '<option value="' + NO_OWNER + '">ไม่ระบุเจ้าของงบ</option>' : '');
+}
+
+/**
+ * ประเภทสัญญาจากอักษรนำหน้าเลขที่สัญญา
+ *   ซล = ซื้อ งบลงทุน · จล = จ้าง งบลงทุน
+ *   ซท = ซื้อ งบทำการ · จท = จ้าง งบทำการ
+ * ขึ้นต้นแบบอื่น = ไม่ทราบประเภท (เห็นเฉพาะตอนเลือก "ทั้งหมด")
+ */
+var KIND_BUY  = { 'ซ':'ซื้อ',  'จ':'จ้าง' };
+var KIND_FUND = { 'ล':'ลงทุน', 'ท':'ทำการ' };
+
+function kindOf(no){
+  var m = String(no || '').trim().match(/^([ซจ])([ลท])/);
+  return m ? { buy:KIND_BUY[m[1]], fund:KIND_FUND[m[2]] } : { buy:'', fund:'' };
+}
+
+/** ช่องตัวกรอง ↔ ชื่อพารามิเตอร์ในลิงก์ */
+var FILTERS = ['kind', 'fund', 'owner'];
+
+/** ?kind=ซื้อ&fund=ลงทุน&owner=ฝบย.&q=ซล.14 เปิดมาพร้อมตัวกรอง */
+function readUrl(){
+  var u = new URLSearchParams(location.search);
+  FILTERS.forEach(function(id){
+    var v = u.get(id), sel = document.getElementById(id);
+    if (v && Array.prototype.some.call(sel.options, function(x){ return x.value === v; })){
+      sel.value = v;
+    }
+  });
+  var q = u.get('q');
+  if (q) document.getElementById('q').value = q;
+}
+
+/** จำตัวกรองไว้ในลิงก์ กดรีเฟรชหรือส่งลิงก์ต่อแล้วยังกรองอยู่ */
+function saveUrl(){
+  var u = new URL(location.href);
+  FILTERS.forEach(function(id){
+    var v = document.getElementById(id).value;
+    if (v) u.searchParams.set(id, v); else u.searchParams.delete(id);
+  });
+  history.replaceState(null, '', u);
+}
+
+/** ผ่านตัวกรอง ซื้อ/จ้าง · ประเภทงบ · เจ้าของงบ */
+function ownerOk(c){
+  var k = document.getElementById('kind').value;
+  var f = document.getElementById('fund').value;
+  var o = document.getElementById('owner').value;
+  if (k && c.kind.buy !== k)  return false;
+  if (f && c.kind.fund !== f) return false;
+  if (!o) return true;
+  if (o === NO_OWNER) return !c.owner;
+  return c.owner === o;
+}
+
+function kindText(c){
+  if (!c.kind.buy) return '';
+  return c.kind.buy + ' · งบ' + c.kind.fund;
+}
+
+/** สัญญาที่ผ่านตัวกรองค้นหา เจ้าของงบ และสถานะ */
 function visible(){
   var q = document.getElementById('q').value.trim().toLowerCase();
   var withClosed = document.getElementById('showClosed').checked;
 
   return DATA.contracts.filter(function(c){
     if (!withClosed && c.closed) return false;
+    if (!ownerOk(c)) return false;
     if (!q) return true;
-    return (c.contract + ' ' + c.job + ' ' + c.vendor).toLowerCase().indexOf(q) >= 0;
+    return (c.contract + ' ' + c.job + ' ' + c.vendor + ' ' + c.owner)
+      .toLowerCase().indexOf(q) >= 0;
   });
 }
 
@@ -332,7 +437,7 @@ function visible(){
 function drawOverdue(){
   var rows = [];
   DATA.contracts.forEach(function(c){
-    if (c.closed) return;
+    if (c.closed || !ownerOk(c)) return;
     c.steps.forEach(function(s){
       if (s.state !== 'late') return;
       rows.push({ c:c, s:s, over: -(s.days === null ? 0 : s.days) });
@@ -369,6 +474,7 @@ function draw(){
   var ganttEl = document.getElementById('gantt');
   listEl.hidden  = (VIEW !== 'list');
   ganttEl.hidden = (VIEW !== 'gantt');
+  drawOverdue();
 
   if (VIEW === 'gantt') return drawGantt(visible());
 
@@ -385,7 +491,9 @@ function draw(){
 
   if (!rows.length){
     el.innerHTML = '<p class="state">' +
-      (q ? 'ไม่พบสัญญาที่ตรงกับคำค้น' : 'ยังไม่มีสัญญาในทะเบียน เพิ่มได้ที่แท็บ contract') +
+      (q || FILTERS.some(function(id){ return document.getElementById(id).value; })
+         ? 'ไม่พบสัญญาที่ตรงกับตัวกรอง'
+         : 'ยังไม่มีสัญญาในทะเบียน เพิ่มได้ที่แท็บ contract') +
       '</p>';
     return;
   }
@@ -445,6 +553,7 @@ function item(c){
     '<button class="head" aria-expanded="false">' +
       '<span class="bar ' + barClass + '"></span>' +
       '<span><span class="name">' + esc(c.contract) + '</span>' +
+        (c.owner ? '<span class="owner">' + esc(c.owner) + '</span>' : '') +
         (c.job ? '<br><span class="job">' + esc(c.job) + '</span>' : '') + '</span>' +
       '<span class="meta">' + meta + '<br>' + prog + '</span>' +
     '</button>' +
@@ -454,6 +563,8 @@ function item(c){
 
 function detail(c){
   var h = '<dl class="facts">';
+  if (c.kind.buy) h += row('ประเภท', kindText(c));
+  if (c.owner)  h += row('เจ้าของงบ', esc(c.owner));
   if (c.phase)  h += row('ขั้นตอน', esc(c.phase));
   if (c.tor)    h += row('เอกสาร', '<a href="' + esc(c.tor) +
                          '" target="_blank" rel="noopener">เปิดโฟลเดอร์ TOR</a>');
@@ -590,7 +701,8 @@ function drawGantt(rows){
 
   /* --- แต่ละสัญญา --- */
   var body = withSteps.map(function(c){
-    var h = '<p class="grow" title="' + esc(c.job || '') + '">' + esc(c.contract) + '</p>';
+    var h = '<p class="grow" title="' + esc(c.job || '') + '">' + esc(c.contract) +
+            (c.owner ? '<span class="owner">' + esc(c.owner) + '</span>' : '') + '</p>';
 
     h += c.steps.map(function(s){
       var a = s.began || s.planStart || s.planEnd || s.done;

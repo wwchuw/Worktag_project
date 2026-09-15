@@ -2,7 +2,8 @@
 <html lang="th">
 <head>
 <meta charset="utf-8">
-<base target="_blank">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ติดตามงานสัญญา</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600&display=swap" rel="stylesheet">
@@ -256,41 +257,44 @@
 var DATA = null;
 
 /* --------------------------------------------------------------------------
- * GitHub Pages → Apps Script API
- *
- * ใช้ JSONP แทน google.script.run เพราะไฟล์นี้รันอยู่นอก Apps Script
+ * GitHub Pages → Apps Script API (JSONP)
+ * ถ้า Deploy ใหม่แล้วได้ URL ใหม่ ให้แก้บรรทัดนี้บรรทัดเดียว
  * ------------------------------------------------------------------------ */
-var API_URL = 'https://script.google.com/macros/s/AKfycbzgPMuhVLzXQbeouTI37TUebgVS7Eb1HhRgx3DMnI9Bkz4CELJGpvMlfVzg5dhC9deszw/exec';
+var API_URL = 'https://script.google.com/macros/s/AKfycbzjElWDbRkl3n7eO50sZmiguECtbmxpAqfeVSdtTUv5lGEWnZPSnVYbmNFJJH4xAJO83w/exec';
 
 function loadData(){
-  var callbackName = 'wtdCallback_' + Date.now();
-
-  window[callbackName] = function(d){
-    try {
-      start(d);
-    } finally {
-      delete window[callbackName];
-      if (script && script.parentNode) script.parentNode.removeChild(script);
-    }
-  };
-
+  var cb = 'wtdCallback_' + Date.now();
   var script = document.createElement('script');
-  script.src = API_URL +
-    '?callback=' + encodeURIComponent(callbackName) +
-    '&_=' + Date.now();
+  var timer = setTimeout(function(){
+    fail('API ไม่ตอบกลับ กรุณาตรวจสอบว่า Deploy แบบ Anyone แล้ว และ URL ถูกต้อง');
+  }, 20000);
+
+  function cleanup(){
+    clearTimeout(timer);
+    window[cb] = function(){};   // กันกรณีข้อมูลมาช้าหลัง timeout
+    if (script.parentNode) script.parentNode.removeChild(script);
+  }
+  function fail(msg){
+    cleanup();
+    document.getElementById('list').innerHTML = '<p class="state">' + msg + '</p>';
+  }
+
+  window[cb] = function(d){
+    cleanup();
+    if (!d || d.error){
+      fail('Apps Script แจ้งข้อผิดพลาด: ' + esc(d && d.message || 'ไม่ทราบสาเหตุ'));
+      return;
+    }
+    start(d);
+  };
 
   script.onerror = function(){
-    delete window[callbackName];
-    document.getElementById('list').innerHTML =
-      '<p class="state">เปิดข้อมูลไม่ได้ กรุณาตรวจสอบ Apps Script API และสิทธิ์การเข้าถึง<br>' +
-      'ถ้าเพิ่งแก้ Code.gs ให้ Deploy เวอร์ชันใหม่ก่อน</p>';
-    if (script.parentNode) script.parentNode.removeChild(script);
+    fail('เปิดข้อมูลไม่ได้ กรุณาตรวจสอบ Apps Script API และสิทธิ์การเข้าถึง<br>' +
+         'ถ้าเพิ่งแก้ Code.gs ให้ Deploy เวอร์ชันใหม่ก่อน');
   };
-
+  script.src = API_URL + '?callback=' + encodeURIComponent(cb) + '&_=' + Date.now();
   document.head.appendChild(script);
 }
-
-loadData();
 
 function start(d){
   DATA = d;
@@ -664,9 +668,7 @@ function rowsHeight(list){
   return n * 26 + list.length * 40;
 }
 
-function short(t, n){ return t.length > n ? t.slice(0, n - 1) + '…' : t; }
-
-/** 18/09/2026 → 18 ก.ย. */
+/** 2026-09-18 → 18 ก.ย. */
 function dayLabel(iso){
   var p = String(iso).split('-');
   if (p.length < 3) return iso;
@@ -711,6 +713,9 @@ function esc(s){
     .replace(/&/g, '&amp;').replace(/</g, '&lt;')
     .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
+
+/* เรียกโหลดข้อมูลท้ายสุด หลังประกาศฟังก์ชันและตัวแปรทั้งหมดแล้ว */
+loadData();
 </script>
 </body>
 </html>

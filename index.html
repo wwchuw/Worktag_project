@@ -158,6 +158,8 @@
   .log{ list-style:none; margin:0; padding:0; font-size:13.5px; }
   .log li{ display:flex; gap:10px; padding:4px 0; color:var(--sage); }
   .log .d{ color:var(--ink); white-space:nowrap; }
+  .log .lid{ color:var(--brand-deep); font-size:12px; font-weight:500; white-space:nowrap;
+             font-variant-numeric:tabular-nums; }
   .log a{ color:var(--brand-deep); }
   .facts a{ color:var(--brand-deep); }
 
@@ -350,7 +352,7 @@
 
   <footer class="foot">
     <b>Worktag</b>
-    <span>ข้อมูลจากการติดแท็กในกลุ่ม LINE และ Google sheets</span>
+    <span>ข้อมูลจากการติดแท็กในกลุ่ม LINE และทะเบียนสัญญา</span>
     <button type="button" class="linkbtn" id="logout" hidden>ออกจากระบบ</button>
   </footer>
 </div>
@@ -570,7 +572,8 @@ function visible(){
     if (!withClosed && c.closed) return false;
     if (!ownerOk(c)) return false;
     if (!q) return true;
-    return (c.contract + ' ' + c.job + ' ' + c.vendor + ' ' + c.owner)
+    return (c.contract + ' ' + c.job + ' ' + c.vendor + ' ' + c.owner + ' ' +
+            c.logs.map(function(x){ return x.id || ''; }).join(' '))
       .toLowerCase().indexOf(q) >= 0;
   });
 }
@@ -725,7 +728,7 @@ function detail(c){
          esc(c.contract) + '">ดูแผนนี้ในไทม์ไลน์</button></p>';
   }
 
-  h += '<p class="sub">บันทึกติดแท็กจาก line </p>';
+  h += '<p class="sub">บันทึกจากหน้างาน</p>';
   if (!c.logs.length){
     h += '<p class="muted">ยังไม่มีใครติดแท็กในกลุ่มของสัญญานี้</p>';
   } else {
@@ -737,6 +740,7 @@ function detail(c){
         ? '<a href="' + esc(x.folder) + '" target="_blank" rel="noopener">ไฟล์ ' + x.files + '</a>'
         : 'ไฟล์ ' + x.files);
       return '<li><span class="d">' + (x.date ? thai(x.date) : '—') + '</span>' +
+             (x.id ? '<span class="lid">' + esc(x.id) + '</span>' : '') +
              '<span>' + esc(x.type) + (tail.length ? ' — ' + tail.join(' ') : '') + '</span></li>';
     }).join('') + '</ul>';
     if (c.logs.length > 6){

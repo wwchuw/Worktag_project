@@ -180,13 +180,15 @@
 
   /* ---------- แกนต์ ---------- */
   .gantt{ overflow-x:auto; padding-bottom:8px; }
-  .gantt-inner{ min-width:100%; }
+  .gantt-inner{ --lab:240px; }                     /* ความกว้างคอลัมน์ชื่อขั้นตอน */
 
   .months{ display:flex; border-bottom:1px solid var(--sand); margin-left:var(--lab); }
   .months span{
     flex:none; font-size:12px; color:var(--sage); padding:0 0 5px 6px;
-    border-left:1px solid var(--sand);
+    border-left:1px solid var(--sand); white-space:nowrap; overflow:hidden;
   }
+
+  .gbody{ position:relative; }                     /* กล่องรองรับเส้นวันนี้ ให้สูงเต็มเสมอ */
 
   .grow{ margin:16px 0 4px; font-size:13.5px; font-weight:600; }
   .grow .gsub{ color:var(--sage); font-weight:400; }
@@ -203,11 +205,12 @@
   }
   .bar2{
     position:absolute; top:4px; height:12px; border-radius:3px;
-    background:var(--sage); min-width:3px;
+    background:var(--sage); min-width:3px; z-index:1;
   }
   .bar2 .tag{
     position:absolute; left:100%; top:-3px; margin-left:7px;
     font-size:11.5px; color:var(--sage); white-space:nowrap;
+    background:var(--paper); padding:0 3px;       /* พื้นทึบ กันเส้นวันนี้ทับตัวหนังสือ */
   }
   .bar2.late .tag{ color:var(--alert); }
   .bar2.tagleft .tag{ left:auto; right:100%; margin:0 7px 0 0; }
@@ -222,8 +225,8 @@
 
   .today{
     position:absolute; top:0; bottom:0; width:1px; background:var(--alert); opacity:.55;
+    z-index:0; pointer-events:none;
   }
-  .todaywrap{ position:relative; margin-left:var(--lab); }
 
   .jump{ margin:10px 0 0; }
   .jump button{
@@ -786,66 +789,61 @@ function stepLi(s){
 function row(k, v){ return '<div><dt>' + k + '</dt><dd>' + v + '</dd></div>'; }
 
 /* ---------- ไทม์ไลน์ ---------- */
-var PX_MONTH = 104;          // ความกว้างต่อเดือน
-var LABEL_W  = 170;          // ความกว้างคอลัมน์ชื่อขั้นตอน
+var PX_MONTH = 104;          // ความกว้างขั้นต่ำต่อเดือน (จอแคบจะเลื่อนซ้ายขวาได้)
+/* ความกว้างคอลัมน์ชื่อขั้นตอน กำหนดใน CSS (.gantt-inner --lab) เพื่อให้ media query มือถือใช้ได้ */
+
+/** ช่วงวันที่ที่แท่งจะวาดจริง ใช้ทั้งหาช่วงแกนและวาดแท่ง ให้ตรงกันเสมอ */
+function barRange(s){
+  var a = s.began || s.planStart || s.planEnd || s.done;
+  var b = s.done || s.planEnd || s.planStart || s.began;
+  if (!a) return null;
+  if (b < a){ var t = a; a = b; b = t; }
+  return [a, b];
+}
 
 function drawGantt(rows){
   var el = document.getElementById('gantt');
 
-  var withSteps = rows.filter(function(c){ return c.steps.length; });
+  var withSteps = rows.filter(function(c){ return c.steps.some(barRange); });
   if (!withSteps.length){
-    el.innerHTML = '<p class="state">ยังไม่มีแผนงานให้แสดง เพิ่มขั้นตอนได้ที่แท็บ contract_step</p>';
+    el.innerHTML = '<p class="state">ยังไม่มีแผนงานที่ระบุวันที่ เพิ่มขั้นตอนได้ที่แท็บ contract_step</p>';
     return;
   }
 
-  /* --- หาช่วงเวลาที่ต้องแสดง --- */
-  var lo = null, hi = null;
+  /* --- ช่วงแกน: จากแท่งที่วาดจริง + วันนี้ --- */
+  var lo = DATA.today, hi = DATA.today;
   withSteps.forEach(function(c){
     c.steps.forEach(function(s){
-      [s.planStart, s.planEnd, s.began, s.done].forEach(function(d){
-        if (!d) return;
-        if (lo === null || d < lo) lo = d;
-        if (hi === null || d > hi) hi = d;
-      });
+      var r = barRange(s);
+      if (!r) return;
+      if (r[0] < lo) lo = r[0];
+      if (r[1] > hi) hi = r[1];
     });
   });
-  if (lo === null){
-    el.innerHTML = '<p class="state">แผนงานยังไม่ได้ระบุวันที่</p>';
-    return;
-  }
-  if (DATA.today < lo) lo = DATA.today;
-  if (DATA.today > hi) hi = DATA.today;
 
   var first = monthStart(lo);
-  var last  = monthStart(hi);
-  var months = [];
-  var cur = first;
-  while (cur <= last && months.length < 60){
-    months.push(cur);
-    cur = addMonth(cur, 1);
-  }
-  var endEx = addMonth(last, 1);                 // วันแรกของเดือนถัดจากเดือนสุดท้าย
+  var endEx = addMonth(monthStart(hi), 1);       // วันแรกของเดือนถัดจากเดือนสุดท้าย
   var span  = days(first, endEx);
-  var width = months.length * PX_MONTH;
+  var months = [];
+  for (var m = first; m < endEx && months.length < 60; m = addMonth(m, 1)) months.push(m);
 
-  /* --- หัวเดือน --- */
+  /* --- หัวเดือน: กว้างเป็น % ตามจำนวนวันจริง สเกลเดียวกับแท่ง --- */
   var head = '<div class="months">' + months.map(function(m){
     var p = m.split('-');
-    return '<span style="width:' + PX_MONTH + 'px">' + TH[Number(p[1]) - 1] +
+    var w = days(m, addMonth(m, 1)) / span * 100;
+    return '<span style="width:' + w + '%">' + TH[Number(p[1]) - 1] +
            (Number(p[1]) === 1 || m === first ? ' ' + String(Number(p[0]) + 543).slice(-2) : '') +
            '</span>';
   }).join('') + '</div>';
 
-  /* --- เส้นวันนี้ --- */
-  var tPct = pct(first, DATA.today, span);
-  var todayLine = '<div class="todaywrap" style="height:0">' +
-      '<div class="today" style="left:' + tPct + '%; height:' + rowsHeight(withSteps) + 'px"></div>' +
-    '</div>';
+  /* --- เส้นวันนี้: วางใน .gbody สูงเต็มกล่องเสมอ --- */
+  var tFrac = pct(first, DATA.today, span) / 100;
+  var todayLine = '<div class="today" style="left:calc(var(--lab) + (100% - var(--lab)) * ' +
+                  tFrac + ')"></div>';
 
   /* --- เส้นแบ่งเดือน ใช้ซ้ำทุกราง --- */
   var grid = '<span class="grid">' + months.map(function(m, i){
-    if (!i) return '';
-    return '<span style="left:' + pct(first, m, span) + '%"></span>';
+    return i ? '<span style="left:' + pct(first, m, span) + '%"></span>' : '';
   }).join('') + '</span>';
 
   /* --- แต่ละสัญญา --- */
@@ -854,10 +852,9 @@ function drawGantt(rows){
             (c.owner ? '<span class="owner">' + esc(c.owner) + '</span>' : '') + '</p>';
 
     h += c.steps.map(function(s){
-      var a = s.began || s.planStart || s.planEnd || s.done;
-      var b = s.done || s.planEnd || s.planStart || s.began;
-      if (!a) return '';
-      if (b < a){ var t = a; a = b; b = t; }
+      var r = barRange(s);
+      if (!r) return '';
+      var a = r[0], b = r[1];
 
       var left  = pct(first, a, span);
       var right = pct(first, addDay(b, 1), span);
@@ -888,9 +885,9 @@ function drawGantt(rows){
   }).join('');
 
   el.innerHTML =
-    '<div class="gantt"><div class="gantt-inner" style="--lab:' + LABEL_W + 'px; width:' +
-      (LABEL_W + width) + 'px">' +
-      head + todayLine + body +
+    '<div class="gantt"><div class="gantt-inner" style="min-width:calc(var(--lab) + ' +
+      (months.length * PX_MONTH) + 'px)">' +
+      head + '<div class="gbody">' + todayLine + body + '</div>' +
     '</div></div>' +
     '<div class="legend">' +
       '<span><i style="background:var(--ok)"></i>เสร็จแล้ว</span>' +
@@ -908,7 +905,6 @@ function drawGantt(rows){
     document.getElementById('q').value = '';
     draw();
   });
-  return;
 }
 
 function barTitle(s){
@@ -921,12 +917,6 @@ function barTitle(s){
   if (s.done)  t += ' · เสร็จ ' + thai(s.done);
   if (s.note)  t += ' · ' + s.note;
   return t;
-}
-
-function rowsHeight(list){
-  var n = 0;
-  list.forEach(function(c){ n += c.steps.length; });
-  return n * 26 + list.length * 40;
 }
 
 /** 2026-09-18 → 18 ก.ย. */
